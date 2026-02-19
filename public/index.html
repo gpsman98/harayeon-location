@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1a1a2e">
+  <meta name="description" content="해라연 위치 공유 어플 - 그룹 기반 실시간 위치 공유">
+  <title>해라연 위치 공유</title>
+  
+  <!-- Leaflet.js CSS (무료 지도) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <script type="module" crossorigin src="/assets/index-D0sgfmNX.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-DAYhW29i.css">
+</head>
+<body>
+  <!-- 로그인 화면 -->
+  <div id="login-screen" class="screen active">
+    <div class="login-container">
+      <div class="login-logo">
+        <div class="logo-icon">📍</div>
+        <h1>해라연</h1>
+        <p class="login-subtitle">위치 공유</p>
+      </div>
+      
+      <div class="login-form">
+        <div class="input-group">
+          <div class="input-icon">👤</div>
+          <input type="text" id="user-id-input" placeholder="사용자 ID" autocomplete="off" maxlength="20">
+        </div>
+        
+        <div class="input-group">
+          <div class="input-icon">👥</div>
+          <input type="text" id="group-name-input" placeholder="그룹 이름" autocomplete="off" maxlength="30">
+        </div>
+        
+        <button id="join-btn" class="btn-primary" disabled>
+          <span>참여하기</span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="login-footer">
+        <p>같은 그룹 이름으로 접속하면<br>서로의 위치를 공유할 수 있습니다</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 지도 화면 -->
+  <div id="map-screen" class="screen">
+    <!-- 상단 바 -->
+    <div id="top-bar">
+      <div class="top-bar-left">
+        <button id="back-btn" class="icon-btn" title="나가기">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+        </button>
+        <div class="top-bar-info">
+          <span class="app-title">해라연</span>
+          <span id="group-label" class="group-badge">그룹명</span>
+        </div>
+      </div>
+      <div class="top-bar-right">
+        <div id="member-count" class="member-badge">
+          <span class="member-dot"></span>
+          <span id="member-count-text">0명</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 지도 컨테이너 -->
+    <div id="map"></div>
+
+    <!-- 하단 컨트롤 -->
+    <div id="bottom-bar">
+      <div class="bottom-bar-content">
+        <div class="sharing-control">
+          <div class="sharing-info">
+            <span id="sharing-icon" class="sharing-status-icon on">📡</span>
+            <div class="sharing-text">
+              <span id="sharing-label">위치 공유 중</span>
+              <span id="my-coords" class="coords-text"></span>
+            </div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="sharing-toggle" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- 연결 상태 표시 -->
+    <div id="connection-status" class="connection-indicator connected">
+      <span class="connection-dot"></span>
+      <span id="connection-text">연결됨</span>
+    </div>
+  </div>
+
+  <!-- Leaflet.js (무료 지도 라이브러리) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+</body>
+</html>
