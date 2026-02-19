@@ -109,37 +109,40 @@ function setupSocketIO(server) {
             currentUserId = userId;
             currentGroup = groupName;
             if (!groups[groupName]) groups[groupName] = {};
-            groups[groupName][userId] = { lat: null, lng: null, sharing: true, socketId: socket.id };
+            groups[groupName][userId] = { lat: null, lng: null, speed: null, heading: null, sharing: true, socketId: socket.id };
             socket.join(groupName);
             console.log(`[참여] ${userId} → 그룹: ${groupName}`);
             broadcastGroupMembers(groupName, io);
         });
 
-        socket.on('update-location', ({ lat, lng }) => {
+        socket.on('update-location', ({ lat, lng, speed, heading }) => {
             if (!currentGroup || !currentUserId) return;
             if (!groups[currentGroup]?.[currentUserId]) return;
             const user = groups[currentGroup][currentUserId];
             user.lat = lat;
             user.lng = lng;
+            user.speed = speed;
+            user.heading = heading;
             if (user.sharing) {
-                socket.to(currentGroup).emit('location-update', { userId: currentUserId, lat, lng, sharing: true });
+                socket.to(currentGroup).emit('location-update', { userId: currentUserId, lat, lng, sharing: true, speed, heading });
             }
+        }
         });
 
-        socket.on('toggle-sharing', ({ sharing }) => {
-            if (!currentGroup || !currentUserId) return;
-            if (!groups[currentGroup]?.[currentUserId]) return;
-            groups[currentGroup][currentUserId].sharing = sharing;
-            console.log(`[공유 ${sharing ? 'ON' : 'OFF'}] ${currentUserId} (그룹: ${currentGroup})`);
-            if (!sharing) socket.to(currentGroup).emit('member-hidden', { userId: currentUserId });
-            broadcastGroupMembers(currentGroup, io);
-        });
-
-        socket.on('disconnect', () => {
-            console.log(`[해제] ${socket.id} (${currentUserId || '미등록'})`);
-            if (currentGroup && currentUserId) leaveGroup(currentGroup, currentUserId, socket, io);
-        });
+    socket.on('toggle-sharing', ({ sharing }) => {
+        if (!currentGroup || !currentUserId) return;
+        if (!groups[currentGroup]?.[currentUserId]) return;
+        groups[currentGroup][currentUserId].sharing = sharing;
+        console.log(`[공유 ${sharing ? 'ON' : 'OFF'}] ${currentUserId} (그룹: ${currentGroup})`);
+        if (!sharing) socket.to(currentGroup).emit('member-hidden', { userId: currentUserId });
+        broadcastGroupMembers(currentGroup, io);
     });
+
+    socket.on('disconnect', () => {
+        console.log(`[해제] ${socket.id} (${currentUserId || '미등록'})`);
+        if (currentGroup && currentUserId) leaveGroup(currentGroup, currentUserId, socket, io);
+    });
+});
 }
 
 function leaveGroup(groupName, userId, socket, io) {
@@ -159,7 +162,7 @@ function leaveGroup(groupName, userId, socket, io) {
 function broadcastGroupMembers(groupName, io) {
     if (!groups[groupName]) return;
     const members = Object.entries(groups[groupName]).map(([userId, data]) => ({
-        userId, lat: data.lat, lng: data.lng, sharing: data.sharing
+        userId, lat: data.lat, lng: data.lng, sharing: data.sharing, speed: data.speed, heading: data.heading
     }));
     io.to(groupName).emit('group-members', { members });
 }
