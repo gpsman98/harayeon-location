@@ -10,7 +10,7 @@ const app = express();
 app.use(cors());
 app.use(express.json()); // REST API용 JSON 파싱
 
-let ioInstance = null; // Socket.IO 글로벌 인스턴스 (REST API에서 접근용)
+let ioInstances = []; // Socket.IO 인스턴스 배열 (HTTP + HTTPS 각각 별도 io)
 
 // 정적 파일 서빙 (프론트엔드)
 const publicPath = path.join(__dirname, 'public');
@@ -34,30 +34,48 @@ app.get('/api/status', (req, res) => {
 // API: 네이티브 백그라운드 서비스용 위치 업데이트 (HTTP POST)
 app.post('/api/update-location', (req, res) => {
     const { userId, groupName, lat, lng, speed, heading } = req.body;
+    console.log(`[REST] update-location: ${userId} / ${groupName} / ${lat},${lng}`);
+
     if (!userId || !groupName) {
         return res.status(400).json({ error: 'missing params' });
     }
 
-    // 그룹에 사용자가 있으면 위치 갱신
-    if (groups[groupName]?.[userId]) {
-        const user = groups[groupName][userId];
-        user.lat = lat;
-        user.lng = lng;
-        user.speed = speed || null;
-        user.heading = heading || null;
-        user.active = true;
-        user.lastSeen = Date.now();
+    // 그룹이 없으면 생성
+    if (!groups[groupName]) {
+        groups[groupName] = {};
+    }
 
-        // Socket.IO로 다른 멤버들에게 브로드캐스트
-        if (ioInstance && user.sharing) {
-            ioInstance.to(groupName).emit('location-update', {
+    // 사용자가 없으면 생성 (소켓 연결 없이 HTTP만으로도 동작)
+    if (!groups[groupName][userId]) {
+        groups[groupName][userId] = {
+            lat: null, lng: null, speed: null, heading: null,
+            sharing: true, socketId: null, active: true,
+            lastSeen: Date.now()
+        };
+        console.log(`[REST] 사용자 ${userId}를 그룹 ${groupName}에 새로 등록`);
+    }
+
+    const user = groups[groupName][userId];
+    user.lat = lat;
+    user.lng = lng;
+    user.speed = speed || null;
+    user.heading = heading || null;
+    user.active = true;
+    user.sharing = true;  // REST로 위치 보내면 항상 sharing
+    user.lastSeen = Date.now();
+
+    // Socket.IO로 브로드캐스트 (모든 서버 인스턴스에 전송)
+    if (ioInstances.length > 0) {
+        ioInstances.forEach(io => {
+            io.to(groupName).emit('location-update', {
                 userId, lat, lng, sharing: true, speed: speed || null, heading: heading || null
             });
-        }
-        res.json({ ok: true });
+        });
+        console.log(`[REST] 브로드캐스트 완료: ${groupName} 그룹 (인스턴스 ${ioInstances.length}개)`);
     } else {
-        res.status(404).json({ error: 'user not in group' });
+        console.warn('[REST] io 인스턴스 없음! 브로드캐스트 실패');
     }
+    res.json({ ok: true });
 });
 
 // 모든 경로를 index.html로 (SPA 지원)
@@ -130,7 +148,7 @@ function setupSocketIO(server) {
     const io = new Server(server, {
         cors: { origin: '*', methods: ['GET', 'POST'] }
     });
-    ioInstance = io; // 글로벌 인스턴스 저장 (REST API용)
+    ioInstances.push(io); // 배열에 추가 (HTTP + HTTPS 각각)
 
     io.on('connection', (socket) => {
         console.log(`[연결] ${socket.id}`);
