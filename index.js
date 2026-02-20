@@ -109,7 +109,20 @@ function setupSocketIO(server) {
             currentUserId = userId;
             currentGroup = groupName;
             if (!groups[groupName]) groups[groupName] = {};
-            groups[groupName][userId] = { lat: null, lng: null, speed: null, heading: null, sharing: true, socketId: socket.id };
+
+            // 기존 데이터가 있으면 유지하되, 소켓ID와 상태만 갱신
+            const existingUser = groups[groupName][userId];
+            groups[groupName][userId] = {
+                lat: existingUser ? existingUser.lat : null,
+                lng: existingUser ? existingUser.lng : null,
+                speed: existingUser ? existingUser.speed : null,
+                heading: existingUser ? existingUser.heading : null,
+                sharing: existingUser ? existingUser.sharing : true,
+                socketId: socket.id,
+                active: true,
+                lastSeen: Date.now()
+            };
+
             socket.join(groupName);
             console.log(`[참여] ${userId} → 그룹: ${groupName}`);
             broadcastGroupMembers(groupName, io);
@@ -123,6 +136,8 @@ function setupSocketIO(server) {
             user.lng = lng;
             user.speed = speed;
             user.heading = heading;
+            user.active = true;
+            user.lastSeen = Date.now();
             if (user.sharing) {
                 socket.to(currentGroup).emit('location-update', { userId: currentUserId, lat, lng, sharing: true, speed, heading });
             }
@@ -139,7 +154,23 @@ function setupSocketIO(server) {
 
         socket.on('disconnect', () => {
             console.log(`[해제] ${socket.id} (${currentUserId || '미등록'})`);
-            if (currentGroup && currentUserId) leaveGroup(currentGroup, currentUserId, socket, io);
+            // 연결이 끊겨도 그룹에서 삭제하지 않고 '오프라인' 상태로 전환 (마커 유지)
+            if (currentGroup && currentUserId && groups[currentGroup]?.[currentUserId]) {
+                const user = groups[currentGroup][currentUserId];
+                user.active = false;
+                user.lastSeen = Date.now();
+                // 다른 멤버들에게 상태 변경 알림
+                broadcastGroupMembers(currentGroup, io);
+            }
+        });
+
+        // 명시적으로 그룹 나가기 (로그아웃 버튼 등)
+        socket.on('leave-group', () => {
+            if (currentGroup && currentUserId) {
+                leaveGroup(currentGroup, currentUserId, socket, io);
+                currentUserId = null;
+                currentGroup = null;
+            }
         });
     });
 }
@@ -147,6 +178,8 @@ function setupSocketIO(server) {
 function leaveGroup(groupName, userId, socket, io) {
     if (groups[groupName]?.[userId]) {
         delete groups[groupName][userId];
+        console.log(`[나가기] ${userId} (그룹: ${groupName})`);
+
         if (Object.keys(groups[groupName]).length === 0) {
             delete groups[groupName];
             console.log(`[그룹 삭제] ${groupName}`);
@@ -161,7 +194,14 @@ function leaveGroup(groupName, userId, socket, io) {
 function broadcastGroupMembers(groupName, io) {
     if (!groups[groupName]) return;
     const members = Object.entries(groups[groupName]).map(([userId, data]) => ({
-        userId, lat: data.lat, lng: data.lng, sharing: data.sharing, speed: data.speed, heading: data.heading
+        userId,
+        lat: data.lat,
+        lng: data.lng,
+        sharing: data.sharing,
+        speed: data.speed,
+        heading: data.heading,
+        active: data.active,
+        lastSeen: data.lastSeen
     }));
     io.to(groupName).emit('group-members', { members });
 }
